@@ -30,7 +30,6 @@ export class ReportsController {
     const jsonFile = await csv().fromFile(csvFilePath);
     const dateRangeFilter = new Promise((resolve) => {
       let filterData;
-      console.log(Object.keys(queryParams).length);
       if (Object.keys(queryParams).length) {
         try {
           const startDate = queryParams.dateFrom
@@ -69,7 +68,6 @@ export class ReportsController {
         resolve(filterData);
       }
     });
-    console.log(await dateRangeFilter);
     res.send(await dateRangeFilter);
   }
 
