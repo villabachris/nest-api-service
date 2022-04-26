@@ -2,31 +2,27 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as csv from 'csvtojson';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Report } from './interfaces/report.interface';
 
 @Injectable()
 export class ReportsService {
-  constructor() {}
+  constructor(@InjectModel('Report') private reportModel: Model<Report>) {}
 
-  allFiles(res): void {
-    const directoryPath = path.join(process.cwd(), `/files/`);
-    fs.readdir(directoryPath, (err, files) => {
-      //handling error
-      if (err) {
-        console.log('Unable to scan directory: ' + err);
-      }
-      res.send(files);
-    });
-  }
+  async findReport(id, queryParams): Promise<any> {
+    const data = await this.reportModel.findOne({ _id: id });
+    const record = data.buffer;
+    const headers = [
+      'userName',
+      'age',
+      'height',
+      'Gender',
+      'sales',
+      'lastPurchasedDate',
+    ];
 
-  async findReport(queryParams, res): Promise<any> {
-    const directoryPath = path.join(process.cwd(), `/files/`);
-    const csvFilePath = `${directoryPath}${queryParams.csvFile}`;
-
-    if (!queryParams.csvFile) {
-      return res.send('Please provide a CSV file');
-    }
-
-    const jsonFile = await csv().fromFile(csvFilePath);
+    const jsonFile = await csv({ headers: headers }).fromString(record);
 
     const dateRangeFilter = new Promise((resolve) => {
       let filterData;
@@ -45,7 +41,7 @@ export class ReportsService {
               resolve(`Date to cannot be earlier than Date From`);
             }
             filterData = jsonFile.filter((result) => {
-              const date = new Date(result.LAST_PURCHASE_DATE);
+              const date = new Date(result.lastPurchasedDate);
               return date >= startDate && date <= endDate;
             });
             if (filterData.length === 0) {
@@ -57,14 +53,14 @@ export class ReportsService {
           }
           if (queryParams.dateFrom) {
             filterData = jsonFile.filter((result) => {
-              const date = new Date(result.LAST_PURCHASE_DATE);
+              const date = new Date(result.lastPurchasedDate);
               return date >= startDate && date <= startDate;
             });
             resolve(filterData);
           }
           if (queryParams.dateTo) {
             filterData = jsonFile.filter((result) => {
-              const date = new Date(result.LAST_PURCHASE_DATE);
+              const date = new Date(result.lastPurchasedDate);
               return date >= endDate && date <= endDate;
             });
             resolve(filterData);
@@ -77,16 +73,17 @@ export class ReportsService {
         resolve(filterData);
       }
     });
-    res.send(await dateRangeFilter);
+    return await dateRangeFilter;
   }
-  async create(data_csv: any): Promise<any> {
-    if (typeof data_csv === 'undefined') {
-      return 'Please provide a CSV file';
-    }
+
+  async create(data_csv): Promise<any> {
     const response = {
       file: data_csv.originalname,
+      buffer: data_csv.buffer,
       size: data_csv.size,
     };
-    return response;
+
+    const newRecord = new this.reportModel(response);
+    return await newRecord.save();
   }
 }

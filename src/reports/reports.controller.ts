@@ -6,44 +6,28 @@ import {
   Res,
   UseInterceptors,
   UploadedFile,
+  Body,
+  Param,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReportsService } from './reports.service';
-import { diskStorage } from 'multer';
-import * as path from 'path';
-import { v4 as uuid } from 'uuid';
-import { Response } from 'express';
+import { Report } from './interfaces/report.interface';
 
-@Controller()
+@Controller('sales')
 export class ReportsController {
   constructor(private readonly reportService: ReportsService) {}
 
-  @Get('/sales/report/')
-  async dataRange(@Query() queryParams, @Res() res: Response): Promise<void> {
-    return this.reportService.findReport(queryParams, res);
+  @Get('report/:id')
+  async dataRange(@Param('id') id, @Query() queryParams): Promise<Report> {
+    return this.reportService.findReport(id, queryParams);
   }
 
-  @Get('/files')
-  allFiles(@Res() res: Response) {
-    return this.reportService.allFiles(res);
-  }
-
-  @Post('/sales/record')
-  @UseInterceptors(
-    FileInterceptor('data_csv', {
-      storage: diskStorage({
-        destination: './files',
-        filename: (req, file, cb) => {
-          const origName = file.originalname;
-          const fileName = `${
-            origName.replace('.', ',').split(',')[0]
-          }.${uuid()}`;
-          return cb(null, `${fileName}${path.extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
-  async create(@UploadedFile() data_csv): Promise<object> {
+  @Post('/record')
+  @UseInterceptors(FileInterceptor('data_csv'))
+  async create(@UploadedFile() data_csv): Promise<any> {
+    if (typeof data_csv === 'undefined') {
+      return 'Please provide a CSV file';
+    }
     return this.reportService.create(data_csv);
   }
 }
