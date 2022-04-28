@@ -1,6 +1,9 @@
 export interface Report {
     id?: string;
-    file: string;
-    buffer: string;
-    size: string;
+    userName: string;
+    age: string;
+    height: string;
+    Gender: string;
+    sales: string;
+    lastPurchasedDate: Date;
 }

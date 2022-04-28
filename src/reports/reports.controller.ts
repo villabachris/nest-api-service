@@ -3,11 +3,8 @@ import {
   Get,
   Post,
   Query,
-  Res,
   UseInterceptors,
   UploadedFile,
-  Body,
-  Param,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReportsService } from './reports.service';
@@ -17,9 +14,9 @@ import { Report } from './interfaces/report.interface';
 export class ReportsController {
   constructor(private readonly reportService: ReportsService) {}
 
-  @Get('report/:id')
-  async dataRange(@Param('id') id, @Query() queryParams): Promise<Report> {
-    return this.reportService.findReport(id, queryParams);
+  @Get('report')
+  async dataRange(@Query() queryParams): Promise<Report> {
+    return this.reportService.findReport(queryParams);
   }
 
   @Post('/record')

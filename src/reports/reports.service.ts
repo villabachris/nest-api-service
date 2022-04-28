@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as csv from 'csvtojson';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
@@ -9,10 +7,37 @@ import { Report } from './interfaces/report.interface';
 @Injectable()
 export class ReportsService {
   constructor(@InjectModel('Report') private reportModel: Model<Report>) {}
+  async findReport(queryParams): Promise<any> {
+    if (Object.keys(queryParams).length) {
+      const startDate = queryParams.dateFrom
+        ? new Date(queryParams.dateFrom)
+        : '';
 
-  async findReport(id, queryParams): Promise<any> {
-    const data = await this.reportModel.findOne({ _id: id });
-    const record = data.buffer;
+      const endDate = queryParams.dateTo ? new Date(queryParams.dateTo) : '';
+
+      if (!startDate) {
+        return 'No data found';
+      }
+      if (startDate || endDate) {
+        return !endDate
+          ? this.reportModel.find({
+              lastPurchasedDate: {
+                $gte: startDate.setDate(startDate.getDate() + 1),
+                $lte: startDate,
+              },
+            })
+          : this.reportModel.find({
+              lastPurchasedDate: {
+                $gte: startDate.setDate(startDate.getDate() + 1),
+                $lte: endDate.setDate(endDate.getDate() + 1),
+              },
+            });
+      }
+    }
+    return this.reportModel.find();
+  }
+
+  async create(data_csv): Promise<any> {
     const headers = [
       'userName',
       'age',
@@ -22,68 +47,19 @@ export class ReportsService {
       'lastPurchasedDate',
     ];
 
-    const jsonFile = await csv({ headers: headers }).fromString(record);
+    const jsonFile = await csv({ headers: headers }).fromString(
+      data_csv.buffer.toString(),
+    );
 
-    const dateRangeFilter = new Promise((resolve) => {
-      let filterData;
-      if (Object.keys(queryParams).length) {
-        try {
-          const startDate = queryParams.dateFrom
-            ? new Date(queryParams.dateFrom.toString())
-            : '';
-          const endDate = queryParams.dateTo
-            ? new Date(queryParams.dateTo.toString())
-            : '';
-          if (queryParams.dateFrom && queryParams.dateTo) {
-            if (startDate > endDate) {
-              resolve(`Date From cannot be later than Date to`);
-            } else if (endDate < startDate) {
-              resolve(`Date to cannot be earlier than Date From`);
-            }
-            filterData = jsonFile.filter((result) => {
-              const date = new Date(result.lastPurchasedDate);
-              return date >= startDate && date <= endDate;
-            });
-            if (filterData.length === 0) {
-              resolve(
-                `No data at range between of ${queryParams.dateFrom} and ${queryParams.dateTo}`,
-              );
-            }
-            resolve(filterData);
-          }
-          if (queryParams.dateFrom) {
-            filterData = jsonFile.filter((result) => {
-              const date = new Date(result.lastPurchasedDate);
-              return date >= startDate && date <= startDate;
-            });
-            resolve(filterData);
-          }
-          if (queryParams.dateTo) {
-            filterData = jsonFile.filter((result) => {
-              const date = new Date(result.lastPurchasedDate);
-              return date >= endDate && date <= endDate;
-            });
-            resolve(filterData);
-          }
-        } catch (err) {
-          console.log('err', err);
-        }
-      } else {
-        filterData = jsonFile.map((data) => data);
-        resolve(filterData);
-      }
+    const newRecord = jsonFile.map((data) => {
+      const report = new this.reportModel(data);
+      return new Promise((resolve) => {
+        report.save((err, result) => {
+          resolve(result);
+        });
+      });
     });
-    return await dateRangeFilter;
-  }
 
-  async create(data_csv): Promise<any> {
-    const response = {
-      file: data_csv.originalname,
-      buffer: data_csv.buffer,
-      size: data_csv.size,
-    };
-
-    const newRecord = new this.reportModel(response);
-    return await newRecord.save();
+    return Promise.all(newRecord);
   }
 }
